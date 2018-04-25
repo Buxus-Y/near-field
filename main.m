@@ -18,7 +18,8 @@ ln=dp;
 li=1e-6;
 lr=5e-5;
 darray=[0,lp,li,ln,d,lr];
-ep=[epA,epn,epi,epp,1,epr,epA];
+bias=[0:0.001:1.3];
+epsi=[epA,epn,epi,epp,1,epr,epA]; %dielectric function
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Initiaization of different parameters
 w1=2.0e12; %rad/s about 940 um in wavelength
@@ -32,25 +33,36 @@ nw=floor((w2-w1)/dw+1)  %1001 2001
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %calculation of total energy flux
       for ii=1:nw
-        for j=1
              w(ii)=w1+(ii-1)*dw;
-             %dielectric function
-             epsi1=Lorentz_GaAs(w(ii));%for emitter
-             epsi2=Drude_Si(w(ii));%for receiver
+             
 % Calculating the radiative heat transfer
 %------------------------------------------
              a1 = (w(ii)-10)/c0;    %a0 and a1 for the integration of propagating waves. 
              ae1 = (w(ii)+10)/c0;     %integration limit of evanescient waves
              ae2 = max(0.6/d,const1*w(ii)/c0); 
              ae3 = max(5/d,const2*w(ii)/c0);
-             
+             errp=0.01;
+			 err1=0.1;
+			 err2=0.01;
              Q1(ii)=h*w(ii)/(exp(h*w(ii)/(kb*T1))-1);    %% Planck Oscillator
-             Q2(ii)=h*w(ii)/(exp(h*w(ii)/(kb*T2))-1);
-             [T_w_p] = Uni_spec(w(ii), nk, d, a0, a1, epsi_O1, epsi_E1, epsi_O2, epsi_E2);
-             [T_w_e1]= Uni_spec(w(ii), nk, d, ae1, ae2, epsi_O1, epsi_E1, epsi_O2, epsi_E2);
-             [T_w_e2]= Uni_spec(w(ii), nk, d, ae2, ae3, epsi_O1, epsi_E1, epsi_O2, epsi_E2);
-             S_weach(ii,j) = (T_w_p+T_w_e1+T_w_e2)*(Q1(ii)-Q2(ii));
-
+             Q2(ii)=h*w(ii)/(exp((h*w(ii)-qe*bias)/(kb*T1))-1);
+			 Q3(ii)=h*w(ii)/(exp(h*w(ii)/(kb*T1))-1);
+			 T_w=zeros(3,4);
+             [T_w(1,1)] = dygreen_int(w(ii), nk, darray,a0, a1, epsi,2 , 6,errp);
+			 [T_w(1,2)] = dygreen_int(w(ii), nk, darray,a0, a1, epsi,3 , 6,errp);
+			 [T_w(1,3)] = dygreen_int(w(ii), nk, darray ,a0, a1, epsi,4 , 6,errp);
+			 [T_w(1,4)] = dygreen_int(w(ii), nk, darray ,a0, a1, epsi,6 , 4,errp);
+             [T_w(2,1)]= dygreen_int(w(ii), nk, darray, ae1, ae2, epsi, 2, 6, err1);
+			 [T_w(2,2)]= dygreen_int(w(ii), nk, darray, ae1, ae2, epsi, 3, 6, err1);
+			 [T_w(2,3)]= dygreen_int(w(ii), nk, darray, ae1, ae2, epsi, 4, 6, err1);
+			 [T_w(2,4)]= dygreen_int(w(ii), nk, darray, ae1, ae2, epsi, 6, 4, err1);
+             [T_w(3,1)]= dygreen_int(w(ii), nk, darray, ae2, ae3, epsi, 2, 6, err2);
+			 [T_w(3,2)]= dygreen_int(w(ii), nk, darray, ae2, ae3, epsi, 3, 6, err2);
+			 [T_w(3,3)]= dygreen_int(w(ii), nk, darray, ae2, ae3, epsi, 4, 6, err2);
+			 [T_w(3,4)]= dygreen_int(w(ii), nk, darray, ae2, ae3, epsi, 6, 4, err2);
+             S_w(ii) = sum(T_w(1,1:3))*Q1(ii)+sum(T_w(2,1:3))*Q2(ii)+sum(T_w(3,1:3))*Q1(ii)-sum(T_w(4,1:3))*Q3(ii);
 %Note: S_w gives an array of the spectral heat flux@@@@@@@@@@@@@
     
-        end
+      end
+  
+             Q_t=(S_w(1)+4*sum(S_w(2:2:(nw-1)))+2*sum(S_w(3:2:(nw-2)))+S_w(nw))*dw/3;
